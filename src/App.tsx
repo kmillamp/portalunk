@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useSupabaseData } from '@/hooks/useSupabaseData'
 import Login from '@/components/Login'
 import Dashboard from '@/components/Dashboard'
 import Sidebar from '@/components/Sidebar'
@@ -12,20 +13,28 @@ import AccessDenied from '@/components/AccessDenied'
 import DJProfile from '@/components/DJProfile'
 import { AccessControlManager } from '@/lib/access-control'
 import type { DJ, Event, Contract, Producer, ViewType } from '@/types'
-import { mockDJs, mockEvents, mockContracts, mockProducers } from '@/data/mockData'
 
 export default function App() {
   const { user, loading, signOut } = useAuth()
+  const { 
+    djs, 
+    events, 
+    contracts, 
+    producers, 
+    loading: dataLoading, 
+    error: dataError,
+    addDJ,
+    updateDJ,
+    addEvent,
+    updateEvent,
+    deleteEvent,
+    addProducer
+  } = useSupabaseData()
+  
   const [currentView, setCurrentView] = useState<ViewType>('dashboard')
   const [selectedDJ, setSelectedDJ] = useState<DJ | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showAddDJModal, setShowAddDJModal] = useState(false)
-  
-  // Estados dos dados (usando dados mockados temporariamente)
-  const [djs, setDJs] = useState<DJ[]>(mockDJs)
-  const [events, setEvents] = useState<Event[]>(mockEvents)
-  const [contracts, setContracts] = useState<Contract[]>(mockContracts)
-  const [producers, setProducers] = useState<Producer[]>(mockProducers)
 
   const handleDJSelect = (dj: DJ) => {
     if (!user) return
@@ -58,36 +67,75 @@ export default function App() {
     setSelectedDJ(null)
   }
 
-  const handleAddDJ = () => {
+  const handleAddDJ = async () => {
     setShowAddDJModal(true)
   }
 
-  const handleAddDJSubmit = (newDJData: Omit<DJ, 'id' | 'created_at' | 'updated_at'>) => {
-    const newDJ: DJ = {
-      ...newDJData,
-      id: Date.now().toString(), // ID temporário
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+  const handleAddDJSubmit = async (newDJData: Omit<DJ, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const { error } = await addDJ(newDJData)
+      if (error) {
+        console.error('Error adding DJ:', error)
+        alert('Erro ao adicionar DJ. Tente novamente.')
+        return
+      }
+      setShowAddDJModal(false)
+    } catch (error) {
+      console.error('Error adding DJ:', error)
+      alert('Erro ao adicionar DJ. Tente novamente.')
     }
-    
-    setDJs(prev => [...prev, newDJ])
-    setShowAddDJModal(false)
   }
 
-  const handleDJUpdate = (updatedDJ: DJ) => {
-    setDJs(prev => prev.map(dj => dj.id === updatedDJ.id ? updatedDJ : dj))
+  const handleDJUpdate = async (updatedDJ: DJ) => {
+    try {
+      const { error } = await updateDJ(updatedDJ.id, updatedDJ)
+      if (error) {
+        console.error('Error updating DJ:', error)
+        alert('Erro ao atualizar DJ. Tente novamente.')
+      }
+    } catch (error) {
+      console.error('Error updating DJ:', error)
+      alert('Erro ao atualizar DJ. Tente novamente.')
+    }
   }
 
-  const handleEventAdded = (newEvent: Event) => {
-    setEvents(prev => [...prev, newEvent])
+  const handleEventAdded = async (newEvent: Event) => {
+    try {
+      const { error } = await addEvent(newEvent)
+      if (error) {
+        console.error('Error adding event:', error)
+        alert('Erro ao adicionar evento. Tente novamente.')
+      }
+    } catch (error) {
+      console.error('Error adding event:', error)
+      alert('Erro ao adicionar evento. Tente novamente.')
+    }
   }
 
-  const handleEventUpdated = (updatedEvent: Event) => {
-    setEvents(prev => prev.map(event => event.id === updatedEvent.id ? updatedEvent : event))
+  const handleEventUpdated = async (updatedEvent: Event) => {
+    try {
+      const { error } = await updateEvent(updatedEvent.id, updatedEvent)
+      if (error) {
+        console.error('Error updating event:', error)
+        alert('Erro ao atualizar evento. Tente novamente.')
+      }
+    } catch (error) {
+      console.error('Error updating event:', error)
+      alert('Erro ao atualizar evento. Tente novamente.')
+    }
   }
 
-  const handleEventDeleted = (eventId: string) => {
-    setEvents(prev => prev.filter(event => event.id !== eventId))
+  const handleEventDeleted = async (eventId: string) => {
+    try {
+      const { error } = await deleteEvent(eventId)
+      if (error) {
+        console.error('Error deleting event:', error)
+        alert('Erro ao excluir evento. Tente novamente.')
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error)
+      alert('Erro ao excluir evento. Tente novamente.')
+    }
   }
 
   const handleLogout = async () => {
@@ -100,7 +148,7 @@ export default function App() {
     }
   }
 
-  if (loading) {
+  if (loading || dataLoading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
@@ -110,7 +158,9 @@ export default function App() {
             <div></div>
             <div></div>
           </div>
-          <p className="text-gray-400 text-lg">Carregando Portal UNK...</p>
+          <p className="text-gray-400 text-lg">
+            {loading ? 'Carregando Portal UNK...' : 'Carregando dados...'}
+          </p>
         </div>
       </div>
     )
@@ -120,6 +170,26 @@ export default function App() {
     return <Login />
   }
 
+  // Show error if data loading failed
+  if (dataError) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Erro ao carregar dados</h2>
+          <p className="text-gray-400 mb-4">{dataError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-semibold text-white hover:from-purple-700 hover:to-blue-700 transition-all duration-300"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      </div>
+    )
+  }
   const isProducer = user.role === 'produtor'
   const filteredEvents = AccessControlManager.filterEvents(events, user)
   const filteredDJs = AccessControlManager.filterDJs(djs, events, user)

@@ -1,14 +1,16 @@
 import React, { useState } from 'react'
 import { Calendar as CalendarIcon, Clock, MapPin, Users, Plus, Edit, FileText, DollarSign, Eye, Trash2 } from 'lucide-react'
+import { useSupabaseData } from '@/hooks/useSupabaseData'
 import type { DJ, Event } from '@/types'
 import ContractModal from './ContractModal'
 
 interface CalendarProps {
   djs: DJ[]
-  onEventAdded: (event: Event) => void
+  onEventAdded: (event: Event) => Promise<void>
 }
 
 export default function Calendar({ djs, onEventAdded }: CalendarProps) {
+  const { events } = useSupabaseData()
   const [showAddEvent, setShowAddEvent] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [showContract, setShowContract] = useState(false)
@@ -25,57 +27,6 @@ export default function Calendar({ djs, onEventAdded }: CalendarProps) {
     booking_fee: ''
   })
 
-  // Mock events - em produção viriam do banco de dados
-  const mockEvents: Event[] = [
-    {
-      id: '1',
-      title: 'Summer Music Festival 2025',
-      description: 'Grande festival de música eletrônica com lineup internacional',
-      event_date: '2025-02-15T20:00:00Z',
-      venue: 'Allianz Parque',
-      city: 'São Paulo',
-      state: 'SP',
-      dj_id: '1',
-      producer_id: '1',
-      status: 'confirmed',
-      ticket_price: 150,
-      expected_attendance: 15000,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z'
-    },
-    {
-      id: '2',
-      title: 'House Night Rio',
-      description: 'Noite especial de house music na Marina da Glória',
-      event_date: '2025-03-08T22:00:00Z',
-      venue: 'Marina da Glória',
-      city: 'Rio de Janeiro',
-      state: 'RJ',
-      dj_id: '2',
-      producer_id: '1',
-      status: 'pending',
-      ticket_price: 80,
-      expected_attendance: 3000,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z'
-    },
-    {
-      id: '3',
-      title: 'Corporate Event Premium',
-      description: 'Evento corporativo exclusivo para clientes VIP',
-      event_date: '2025-01-25T19:00:00Z',
-      venue: 'Hotel Copacabana Palace',
-      city: 'Rio de Janeiro',
-      state: 'RJ',
-      dj_id: '1',
-      producer_id: '2',
-      status: 'confirmed',
-      ticket_price: 0,
-      expected_attendance: 200,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z'
-    }
-  ]
 
   const getDJName = (djId: string) => {
     const dj = djs.find(d => d.id === djId)
@@ -142,7 +93,7 @@ export default function Calendar({ djs, onEventAdded }: CalendarProps) {
   }
 
   // Ordenar eventos por data
-  const sortedEvents = [...mockEvents].sort((a, b) => 
+  const sortedEvents = [...events].sort((a, b) => 
     new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
   )
 
@@ -153,7 +104,7 @@ export default function Calendar({ djs, onEventAdded }: CalendarProps) {
         <div>
           <h1 className="text-3xl font-bold text-white neon-text">Calendário</h1>
           <p className="text-gray-400 mt-1">
-            {mockEvents.length} evento{mockEvents.length !== 1 ? 's' : ''} agendado{mockEvents.length !== 1 ? 's' : ''}
+            {events.length} evento{events.length !== 1 ? 's' : ''} agendado{events.length !== 1 ? 's' : ''}
           </p>
         </div>
         <div className="flex items-center space-x-3">
@@ -195,7 +146,7 @@ export default function Calendar({ djs, onEventAdded }: CalendarProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-400">Total de Eventos</p>
-              <p className="text-2xl font-bold text-white">{mockEvents.length}</p>
+              <p className="text-2xl font-bold text-white">{events.length}</p>
             </div>
             <CalendarIcon className="w-8 h-8 text-purple-400" />
           </div>
@@ -206,7 +157,7 @@ export default function Calendar({ djs, onEventAdded }: CalendarProps) {
             <div>
               <p className="text-sm text-gray-400">Confirmados</p>
               <p className="text-2xl font-bold text-green-400">
-                {mockEvents.filter(e => e.status === 'confirmed').length}
+                {events.filter(e => e.status === 'confirmed').length}
               </p>
             </div>
             <Users className="w-8 h-8 text-green-400" />
@@ -218,7 +169,7 @@ export default function Calendar({ djs, onEventAdded }: CalendarProps) {
             <div>
               <p className="text-sm text-gray-400">Pendentes</p>
               <p className="text-2xl font-bold text-yellow-400">
-                {mockEvents.filter(e => e.status === 'pending').length}
+                {events.filter(e => e.status === 'pending').length}
               </p>
             </div>
             <Clock className="w-8 h-8 text-yellow-400" />
@@ -230,7 +181,7 @@ export default function Calendar({ djs, onEventAdded }: CalendarProps) {
             <div>
               <p className="text-sm text-gray-400">Este Mês</p>
               <p className="text-2xl font-bold text-blue-400">
-                {mockEvents.filter(e => {
+                {events.filter(e => {
                   const eventDate = new Date(e.event_date)
                   const now = new Date()
                   return eventDate.getMonth() === now.getMonth() && 
@@ -356,7 +307,7 @@ export default function Calendar({ djs, onEventAdded }: CalendarProps) {
       )}
 
       {/* Empty state */}
-      {mockEvents.length === 0 && (
+      {events.length === 0 && (
         <div className="glass rounded-xl p-12 text-center">
           <CalendarIcon className="w-16 h-16 text-gray-600 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-400 mb-2">Nenhum evento agendado</h3>

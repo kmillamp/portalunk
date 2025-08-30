@@ -51,6 +51,7 @@ export default function DJProfile({
   const [showEventModal, setShowEventModal] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [eventModalMode, setEventModalMode] = useState<'create' | 'edit' | 'view'>('create')
+  const [isLoadingFinancials, setIsLoadingFinancials] = useState(false)
   
   // Estado para edição do DJ
   const [editData, setEditData] = useState({
@@ -71,7 +72,7 @@ export default function DJProfile({
     'Rock', 'Reggaeton', 'Trap', 'Bass', 'Ambient'
   ]
 
-  // Mock data para demonstração
+  // Mock media data - will be replaced with real Supabase data
   const mockMedia: MediaItem[] = [
     {
       id: '1',
@@ -104,20 +105,46 @@ export default function DJProfile({
     }
   ]
 
-  const mockFinancialData: FinancialData = {
-    totalEarnings: 156000,
-    pendingPayments: 24000,
-    completedEvents: 18,
-    averageEventValue: 8667,
-    monthlyEarnings: [
-      { month: 'Jan', amount: 32000 },
-      { month: 'Fev', amount: 28000 },
-      { month: 'Mar', amount: 35000 },
-      { month: 'Abr', amount: 31000 },
-      { month: 'Mai', amount: 30000 }
-    ]
+  // Calculate real financial data from events
+  const calculateFinancialData = (): FinancialData => {
+    const djEvents = events.filter(event => event.dj_id === dj.id)
+    const completedEvents = djEvents.filter(event => event.status === 'completed')
+    const pendingEvents = djEvents.filter(event => event.status === 'confirmed' || event.status === 'pending')
+    
+    const totalEarnings = completedEvents.reduce((sum, event) => sum + (event.booking_fee || 0), 0)
+    const pendingPayments = pendingEvents.reduce((sum, event) => sum + (event.booking_fee || 0), 0)
+    const averageEventValue = completedEvents.length > 0 ? totalEarnings / completedEvents.length : 0
+    
+    // Calculate monthly earnings for the last 6 months
+    const monthlyEarnings = []
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date()
+      date.setMonth(date.getMonth() - i)
+      const monthEvents = completedEvents.filter(event => {
+        const eventDate = new Date(event.event_date)
+        return eventDate.getMonth() === date.getMonth() && 
+               eventDate.getFullYear() === date.getFullYear()
+      })
+      
+      monthlyEarnings.push({
+        month: months[date.getMonth()],
+        amount: monthEvents.reduce((sum, event) => sum + (event.booking_fee || 0), 0)
+      })
+    }
+    
+    return {
+      totalEarnings,
+      pendingPayments,
+      completedEvents: completedEvents.length,
+      averageEventValue,
+      monthlyEarnings
+    }
   }
 
+  const financialData = calculateFinancialData()
+  
   // Filtrar eventos do DJ
   const djEvents = events.filter(event => event.dj_id === dj.id)
   const upcomingEvents = djEvents.filter(event => new Date(event.event_date) > new Date())
@@ -783,7 +810,7 @@ export default function DJProfile({
                   <DollarSign className="w-5 h-5 text-green-400" />
                 </div>
                 <p className="text-2xl font-bold text-green-400">
-                  R$ {mockFinancialData.totalEarnings.toLocaleString('pt-BR')}
+                  R$ {financialData.totalEarnings.toLocaleString('pt-BR')}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">Últimos 12 meses</p>
               </div>
@@ -794,7 +821,7 @@ export default function DJProfile({
                   <Clock className="w-5 h-5 text-yellow-400" />
                 </div>
                 <p className="text-2xl font-bold text-yellow-400">
-                  R$ {mockFinancialData.pendingPayments.toLocaleString('pt-BR')}
+                  R$ {financialData.pendingPayments.toLocaleString('pt-BR')}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">A receber</p>
               </div>
@@ -805,7 +832,7 @@ export default function DJProfile({
                   <Calendar className="w-5 h-5 text-blue-400" />
                 </div>
                 <p className="text-2xl font-bold text-blue-400">
-                  {mockFinancialData.completedEvents}
+                  {financialData.completedEvents}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">Concluídos</p>
               </div>
@@ -816,7 +843,7 @@ export default function DJProfile({
                   <Star className="w-5 h-5 text-purple-400" />
                 </div>
                 <p className="text-2xl font-bold text-purple-400">
-                  R$ {mockFinancialData.averageEventValue.toLocaleString('pt-BR')}
+                  R$ {financialData.averageEventValue.toLocaleString('pt-BR')}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">Valor médio</p>
               </div>
@@ -826,7 +853,7 @@ export default function DJProfile({
             <div className="glass rounded-xl p-6">
               <h3 className="text-xl font-semibold text-white mb-6">Ganhos Mensais</h3>
               <div className="space-y-4">
-                {mockFinancialData.monthlyEarnings.map((month, index) => (
+                {financialData.monthlyEarnings.map((month, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <span className="text-gray-400 w-12">{month.month}</span>
                     <div className="flex-1 mx-4">
@@ -834,7 +861,7 @@ export default function DJProfile({
                         <div 
                           className="bg-gradient-to-r from-green-500 to-emerald-500 h-3 rounded-full transition-all duration-500"
                           style={{ 
-                            width: `${(month.amount / Math.max(...mockFinancialData.monthlyEarnings.map(m => m.amount))) * 100}%` 
+                            width: `${(month.amount / Math.max(...financialData.monthlyEarnings.map(m => m.amount))) * 100}%` 
                           }}
                         ></div>
                       </div>
@@ -851,13 +878,30 @@ export default function DJProfile({
             <div className="glass rounded-xl p-6">
               <h3 className="text-xl font-semibold text-white mb-4">Histórico de Pagamentos</h3>
               <div className="space-y-3">
-                {[
-                  { date: '15/01/2025', event: 'Summer Festival', amount: 35000, status: 'paid' },
-                  { date: '08/01/2025', event: 'Corporate Event', amount: 12000, status: 'paid' },
-                  { date: '25/12/2024', event: 'New Year Party', amount: 18000, status: 'paid' },
-                  { date: '15/12/2024', event: 'Private Event', amount: 8000, status: 'pending' }
-                ].map((payment, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/10">
+                {djEvents
+                  .filter(event => event.booking_fee && event.booking_fee > 0)
+                  .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
+                  .slice(0, 10)
+                  .map(event => (
+                    <div key={event.id} className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/10">
+                      <div>
+                        <p className="font-medium text-white">{event.title}</p>
+                        <p className="text-sm text-gray-400">{new Date(event.event_date).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-white">
+                          R$ {event.booking_fee?.toLocaleString('pt-BR')}
+                        </p>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          event.status === 'completed' ? 'status-completed' : 'status-pending'
+                        }`}>
+                          {event.status === 'completed' ? 'Pago' : 'Pendente'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                
+                {djEvents.filter(e => e.booking_fee && e.booking_fee > 0).length === 0 && (
                     <div>
                       <p className="font-medium text-white">{payment.event}</p>
                       <p className="text-sm text-gray-400">{payment.date}</p>
@@ -870,12 +914,8 @@ export default function DJProfile({
                         payment.status === 'paid' ? 'status-completed' : 'status-pending'
                       }`}>
                         {payment.status === 'paid' ? 'Pago' : 'Pendente'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+                    <p className="text-center text-gray-400 py-8">
+                      Nenhum histórico de pagamento encontrado
           </div>
         )}
       </div>
@@ -963,14 +1003,8 @@ export default function DJProfile({
                   Cancelar
                 </button>
                 <button
-                  onClick={() => {
-                    setShowUploadModal(false)
-                    // Aqui seria implementado o upload real
-                  }}
-                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl font-semibold text-white hover:from-purple-700 hover:to-blue-700 transition-all duration-300"
                 >
-                  Upload
-                </button>
+                )}
               </div>
             </div>
           </div>

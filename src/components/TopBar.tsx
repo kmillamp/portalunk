@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Bell, Search, Settings, LogOut, User, Menu, X } from 'lucide-react'
+import { useSupabaseData } from '@/hooks/useSupabaseData'
 import type { User as UserType } from '@/types'
 
 interface TopBarProps {
@@ -8,6 +9,7 @@ interface TopBarProps {
 }
 
 export default function TopBar({ user, onLogout }: TopBarProps) {
+  const { events } = useSupabaseData()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
 
@@ -16,6 +18,28 @@ export default function TopBar({ user, onLogout }: TopBarProps) {
     onLogout()
   }
 
+  // Get recent notifications from real data
+  const getRecentNotifications = () => {
+    const recentEvents = events
+      .filter(event => {
+        const eventDate = new Date(event.event_date)
+        const now = new Date()
+        const daysDiff = Math.ceil((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+        return daysDiff <= 7 && daysDiff >= 0 // Events in the next 7 days
+      })
+      .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
+      .slice(0, 3)
+    
+    return recentEvents.map(event => ({
+      id: event.id,
+      title: `Evento próximo: ${event.title}`,
+      description: `${event.venue} - ${new Date(event.event_date).toLocaleDateString('pt-BR')}`,
+      time: `${Math.ceil((new Date(event.event_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} dias`,
+      type: 'event'
+    }))
+  }
+  
+  const notifications = getRecentNotifications()
   return (
     <header className="fixed top-0 right-0 left-0 h-16 glass-dark border-b border-white/10 z-30">
       <div className="flex items-center justify-between h-full px-6">
@@ -48,26 +72,27 @@ export default function TopBar({ user, onLogout }: TopBarProps) {
               <div className="absolute right-0 top-12 w-80 glass rounded-xl border border-white/10 neon-glow z-50">
                 <div className="p-4">
                   <h3 className="font-semibold text-white mb-3">Notificações</h3>
-                  <div className="space-y-3">
-                    <div className="p-3 bg-black/20 rounded-lg border border-white/10">
-                      <p className="text-sm text-white font-medium">Novo contrato pendente</p>
-                      <p className="text-xs text-gray-400 mt-1">DJ Alok - Summer Festival 2025</p>
-                      <p className="text-xs text-purple-400 mt-1">Há 2 horas</p>
+                  {notifications.length > 0 ? (
+                    <>
+                      <div className="space-y-3">
+                        {notifications.map(notification => (
+                          <div key={notification.id} className="p-3 bg-black/20 rounded-lg border border-white/10">
+                            <p className="text-sm text-white font-medium">{notification.title}</p>
+                            <p className="text-xs text-gray-400 mt-1">{notification.description}</p>
+                            <p className="text-xs text-purple-400 mt-1">Em {notification.time}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <button className="w-full mt-4 py-2 text-sm text-purple-400 hover:text-purple-300 font-medium transition-colors">
+                        Ver todas as notificações
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Bell className="w-12 h-12 text-gray-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-400">Nenhuma notificação</p>
                     </div>
-                    <div className="p-3 bg-black/20 rounded-lg border border-white/10">
-                      <p className="text-sm text-white font-medium">Evento confirmado</p>
-                      <p className="text-xs text-gray-400 mt-1">House Night Rio - 08/03/2025</p>
-                      <p className="text-xs text-purple-400 mt-1">Há 5 horas</p>
-                    </div>
-                    <div className="p-3 bg-black/20 rounded-lg border border-white/10">
-                      <p className="text-sm text-white font-medium">Pagamento processado</p>
-                      <p className="text-xs text-gray-400 mt-1">Vintage Culture - R$ 35.000</p>
-                      <p className="text-xs text-purple-400 mt-1">Ontem</p>
-                    </div>
-                  </div>
-                  <button className="w-full mt-4 py-2 text-sm text-purple-400 hover:text-purple-300 font-medium transition-colors">
-                    Ver todas as notificações
-                  </button>
+                  )}
                 </div>
               </div>
             )}

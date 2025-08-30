@@ -123,22 +123,6 @@ export default function Login() {
               </button>
             </form>
 
-            {/* Informações de acesso para teste */}
-            <div className="mt-8 p-4 bg-black/30 rounded-xl border border-white/10">
-              <h3 className="text-sm font-semibold text-gray-300 mb-3">Acesso para Testes:</h3>
-              <div className="space-y-2 text-xs">
-                <div>
-                  <span className="text-gray-400">Administrador:</span>
-                  <br />
-                  <span className="text-white font-mono">admin@unk.com / admin123</span>
-                </div>
-                <div>
-                  <span className="text-gray-400">Produtor:</span>
-                  <br />
-                  <span className="text-white font-mono">produtor@festacompany.com / prod123</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Footer */}

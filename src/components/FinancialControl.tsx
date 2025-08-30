@@ -1,22 +1,58 @@
 import React from 'react'
 import { DollarSign, TrendingUp, TrendingDown, CreditCard, Banknote } from 'lucide-react'
+import { useSupabaseData } from '@/hooks/useSupabaseData'
 
 export default function FinancialControl() {
-  const financialData = {
-    revenue: {
-      current: 285000,
-      previous: 245000,
-      growth: 16.3
-    },
-    pending: {
-      amount: 85000,
-      count: 12
-    },
-    processed: {
-      amount: 200000,
-      count: 28
+  const { events, contracts } = useSupabaseData()
+  
+  // Calculate real financial data from Supabase
+  const calculateFinancialData = () => {
+    const completedEvents = events.filter(e => e.status === 'completed')
+    const pendingEvents = events.filter(e => e.status === 'confirmed' || e.status === 'pending')
+    
+    const totalRevenue = completedEvents.reduce((sum, event) => sum + (event.booking_fee || 0), 0)
+    const pendingAmount = pendingEvents.reduce((sum, event) => sum + (event.booking_fee || 0), 0)
+    
+    const previousMonthEvents = completedEvents.filter(event => {
+      const eventDate = new Date(event.event_date)
+      const lastMonth = new Date()
+      lastMonth.setMonth(lastMonth.getMonth() - 1)
+      return eventDate.getMonth() === lastMonth.getMonth() && 
+             eventDate.getFullYear() === lastMonth.getFullYear()
+    })
+    
+    const currentMonthEvents = completedEvents.filter(event => {
+      const eventDate = new Date(event.event_date)
+      const now = new Date()
+      return eventDate.getMonth() === now.getMonth() && 
+             eventDate.getFullYear() === now.getFullYear()
+    })
+    
+    const previousMonthRevenue = previousMonthEvents.reduce((sum, event) => sum + (event.booking_fee || 0), 0)
+    const currentMonthRevenue = currentMonthEvents.reduce((sum, event) => sum + (event.booking_fee || 0), 0)
+    
+    const growth = previousMonthRevenue > 0 
+      ? ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100 
+      : 0
+    
+    return {
+      revenue: {
+        current: totalRevenue,
+        previous: previousMonthRevenue,
+        growth: growth
+      },
+      pending: {
+        amount: pendingAmount,
+        count: pendingEvents.length
+      },
+      processed: {
+        amount: totalRevenue,
+        count: completedEvents.length
+      }
     }
   }
+  
+  const financialData = calculateFinancialData()
 
   return (
     <div className="space-y-6">
@@ -89,32 +125,47 @@ export default function FinancialControl() {
       <div className="glass rounded-xl p-6">
         <h2 className="text-xl font-semibold text-white mb-6">Transações Recentes</h2>
         <div className="space-y-4">
-          {[
-            { id: 1, dj: 'DJ Alok', amount: 50000, status: 'completed', date: '15/01/2025' },
-            { id: 2, dj: 'Vintage Culture', amount: 35000, status: 'pending', date: '10/01/2025' },
-            { id: 3, dj: 'Anitta', amount: 80000, status: 'completed', date: '05/01/2025' }
-          ].map(transaction => (
-            <div key={transaction.id} className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/10">
+          {events
+            .filter(event => event.booking_fee && event.booking_fee > 0)
+            .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
+            .slice(0, 10)
+            .map(event => {
+              const dj = djs.find(d => d.id === event.dj_id)
+              return (
+                <div key={event.id} className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/10">
+                  <div>
+                    <p className="font-medium text-white">{dj?.name || 'DJ não encontrado'}</p>
+                    <p className="text-sm text-gray-400">{new Date(event.event_date).toLocaleDateString('pt-BR')}</p>
+                    <p className="text-xs text-gray-500">{event.title}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-white">
+                      R$ {event.booking_fee?.toLocaleString('pt-BR')}
+                    </p>
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      event.status === 'completed' 
+                        ? 'status-completed' 
+                        : event.status === 'confirmed'
+                        ? 'status-confirmed'
+                        : 'status-pending'
+                    }`}>
+                      {event.status === 'completed' ? 'Pago' : 
+                       event.status === 'confirmed' ? 'Confirmado' : 'Pendente'}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          
+          {events.filter(e => e.booking_fee && e.booking_fee > 0).length === 0 && (
               <div>
                 <p className="font-medium text-white">{transaction.dj}</p>
                 <p className="text-sm text-gray-400">{transaction.date}</p>
               </div>
-              <div className="text-right">
-                <p className="font-semibold text-white">
-                  R$ {transaction.amount.toLocaleString('pt-BR')}
-                </p>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  transaction.status === 'completed' 
-                    ? 'status-completed' 
                     : 'status-pending'
-                }`}>
-                  {transaction.status === 'completed' ? 'Pago' : 'Pendente'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+          )}
+              <p className="text-center text-gray-400 py-8">
+                Nenhuma transação encontrada
     </div>
   )
 }
